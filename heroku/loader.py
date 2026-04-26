@@ -40,6 +40,7 @@ from .inline.core import InlineManager
 from .translations import Strings, Translator
 from .types import (
     Command,
+    ConfigCategory,
     ConfigValue,
     CoreOverwriteError,
     CoreUnloadError,
@@ -92,6 +93,7 @@ __all__ = [
     "Strings",
     "Translator",
     "ConfigValue",
+    "ConfigCategory",
     "ModuleConfig",
     "owner",
     "group_owner",
