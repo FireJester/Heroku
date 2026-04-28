@@ -96,7 +96,9 @@ class TokenObtainment(InlineUnit):
                         "https://raw.githubusercontent.com/coddrago/Heroku/refs/heads/master/assets/heroku-ava.png"
                     )
                 else:
-                    m = await conv.send_file(main.BASE_PATH / "assets" / "heroku-ava.png")
+                    m = await conv.send_file(
+                        main.BASE_PATH / "assets" / "heroku-ava.png"
+                    )
                 r = await conv.get_response()
 
                 logger.debug(">> <Photo>")
@@ -166,9 +168,9 @@ class TokenObtainment(InlineUnit):
                     ):
                         continue
 
-                    if not self._db.get("heroku.inline", "custom_bot", False) and not BOT_BASE_PATTERN.fullmatch(
-                        button.text.strip("@")
-                    ):
+                    if not self._db.get(
+                        "heroku.inline", "custom_bot", False
+                    ) and not BOT_BASE_PATTERN.fullmatch(button.text.strip("@")):
                         continue
 
                     await fw_protect()
@@ -241,7 +243,9 @@ class TokenObtainment(InlineUnit):
                         await fw_protect()
                         from .. import main
 
-                        m = await conv.send_file(main.BASE_PATH / "assets" / "heroku-ava.png")
+                        m = await conv.send_file(
+                            main.BASE_PATH / "assets" / "heroku-ava.png"
+                        )
                         r = await conv.get_response()
 
                         logger.debug(">> <Photo>")
