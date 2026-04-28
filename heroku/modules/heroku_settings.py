@@ -392,60 +392,6 @@ class HerokuSettingsMod(loader.Module):
         await call.delete()
         await self.invoke("update", "-f", peer="me")
 
-    async def _remove_core_protection(self, call: InlineCall):
-        self._db.set(main.__name__, "remove_core_protection", True)
-        await call.edit(self.strings("core_protection_removed"))
-
-    @loader.command()
-    async def remove_core_protection(self, message: Message):
-        """| Removes core protection"""
-
-        if self._db.get(main.__name__, "remove_core_protection") == True:
-            await utils.answer(message, self.strings("core_protection_already_removed"))
-            return
-        else:
-            await self.inline.form(
-                message=message,
-                text=self.strings("core_protection_confirm"),
-                reply_markup=[
-                    {
-                        "text": self.strings("core_protection_btn"),
-                        "callback": self._remove_core_protection,
-                    },
-                    {
-                        "text": self.strings("btn_no"),
-                        "action": "close",
-                    },
-                ],
-            )
-
-    async def _enable_core_protection(self, call: InlineCall):
-        self._db.set(main.__name__, "remove_core_protection", False)
-        await call.edit(self.strings("core_protection_enabled"))
-
-    @loader.command()
-    async def enable_core_protection(self, message: Message):
-        """| Enables core protection"""
-
-        if self._db.get(main.__name__, "remove_core_protection") == False:
-            await utils.answer(message, self.strings("core_protection_already_enabled"))
-            return
-        else:
-            await self.inline.form(
-                message=message,
-                text=self.strings("core_protection_confirm_e"),
-                reply_markup=[
-                    {
-                        "text": self.strings("core_protection_e_btn"),
-                        "callback": self._enable_core_protection,
-                    },
-                    {
-                        "text": self.strings("btn_no"),
-                        "action": "close",
-                    },
-                ],
-            )
-
     async def inline__restart(
         self,
         call: InlineCall,
