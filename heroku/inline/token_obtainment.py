@@ -28,7 +28,7 @@ if typing.TYPE_CHECKING:
     from ..inline.core import InlineManager
 
 logger = logging.getLogger(__name__)
-BOT_BASE_PATTERN = re.compile(r"\w*_[0-9a-zA-Z]{6}_bot")
+BOT_BASE_PATTERN = re.compile(r"(\w*)_[0-9a-zA-Z]{6}_bot")
 
 
 class TokenObtainment(InlineUnit):
@@ -50,6 +50,8 @@ class TokenObtainment(InlineUnit):
             await m.delete()
             await r.delete()
 
+            from .. import main
+
             if self._db.get("heroku.inline", "custom_bot", False):
                 username = self._db.get("heroku.inline", "custom_bot").strip("@")
                 username = f"@{username}"
@@ -58,14 +60,10 @@ class TokenObtainment(InlineUnit):
                 except ValueError:
                     pass
                 else:
-                    from .. import main
-
                     uid = utils.rand(6)
                     genran = "".join(random.choice(main.LATIN_MOCK))
                     username = f"@{genran}_{uid}_bot"
             else:
-                from .. import main
-
                 uid = utils.rand(6)
                 genran = "".join(random.choice(main.LATIN_MOCK))
                 username = f"@{genran}_{uid}_bot"
@@ -160,17 +158,21 @@ class TokenObtainment(InlineUnit):
 
                 return await self._create_bot() if create_new_if_needed else False
 
+            from .. import main
+
             for row in r.reply_markup.rows:
                 for button in row.buttons:
+                    btn_text = button.text.strip("@")
+
                     if self._db.get("heroku.inline", "custom_bot", False) and (
-                        self._db.get("heroku.inline", "custom_bot", False)
-                        != button.text.strip("@")
+                        self._db.get("heroku.inline", "custom_bot", False) != btn_text
                     ):
                         continue
 
-                    if not self._db.get(
-                        "heroku.inline", "custom_bot", False
-                    ) and not BOT_BASE_PATTERN.fullmatch(button.text.strip("@")):
+                    if not self._db.get("heroku.inline", "custom_bot", False) and not (
+                        (match := BOT_BASE_PATTERN.fullmatch(btn_text))
+                        and match.group(1) in main.LATIN_MOCK
+                    ):
                         continue
 
                     await fw_protect()
