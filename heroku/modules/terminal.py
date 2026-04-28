@@ -342,47 +342,6 @@ class TerminalMod(loader.Module):
         )
         self.activecmds = {}
 
-    @loader.inline_handler()
-    async def exec(self, event: "loader.InlineCall"):
-        """Executes a command from inline mode. Args should be in the format <command> | <args>."""
-
-        user_command = event.args
-
-        if self._is_dangerous(user_command):
-            return {
-                "title": "nelzya",
-                "description": self.strings("dangerous_command").format(
-                    user_command
-                ),
-                "message": "незя"
-            }
-
-        import subprocess
-        try:
-            result = subprocess.run(user_command, shell=True, capture_output=True, text=True, timeout=120)
-            output = result.stdout + result.stderr
-            if result.returncode == 0:
-                title = "Command executed successfully"
-            else:
-                title = f"Command failed with code {result.returncode}"
-            return {
-                "title": title,
-                "description": output[:100] + "..." if len(output) > 100 else output,
-                "message": f"<code>{utils.escape_html(output)}</code>"
-            }
-        except subprocess.TimeoutExpired:
-            return {
-                "title": "Command timed out",
-                "description": "Command execution took too long",
-                "message": "Command timed out after 120 seconds"
-            }
-        except Exception as e:
-            return {
-                "title": "Error",
-                "description": str(e),
-                "message": f"Error executing command: {utils.escape_html(str(e))}"
-            }
-
     @loader.command()
     async def terminalcmd(self, message):
         user_command = utils.get_args_raw(message)
