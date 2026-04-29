@@ -81,6 +81,18 @@ class HerokuConfigMod(loader.Module):
             else self.hide_value(self.lookup(mod).config[option])
         )
 
+    def _guess_back_to_page(
+        self,
+        mod: str,
+        option: str,
+        obj_type: typing.Union[bool, str] = False,
+    ) -> dict:
+        kwargs = {"obj_type": obj_type}
+        cat = self.lookup(mod).config.get_category(option)
+        if cat is not None:
+            kwargs["category"] = cat.name
+        return kwargs
+
     async def inline__set_config(
         self,
         call: InlineCall,
@@ -118,7 +130,7 @@ class HerokuConfigMod(loader.Module):
                         "callback": self.inline__configure,
                         "args": (mod,),
                         "style": "primary",
-                        "kwargs": {"obj_type": obj_type},
+                        "kwargs": self._guess_back_to_page(mod, option, obj_type),
                     },
                     {
                         "text": self.strings("close_btn"),
@@ -155,7 +167,7 @@ class HerokuConfigMod(loader.Module):
                         "callback": self.inline__configure,
                         "args": (mod,),
                         "style": "primary",
-                        "kwargs": {"obj_type": obj_type},
+                        "kwargs": self._guess_back_to_page(mod, option, obj_type),
                     },
                     {
                         "text": self.strings("close_btn"),
@@ -279,7 +291,7 @@ class HerokuConfigMod(loader.Module):
                     "callback": self.inline__configure,
                     "args": (mod,),
                     "style": "primary",
-                    "kwargs": {"obj_type": obj_type},
+                    "kwargs": self._guess_back_to_page(mod, option, obj_type),
                 },
                 {
                     "text": self.strings("close_btn"),
@@ -335,7 +347,7 @@ class HerokuConfigMod(loader.Module):
                         "callback": self.inline__configure,
                         "args": (mod,),
                         "style": "primary",
-                        "kwargs": {"obj_type": obj_type},
+                        "kwargs": self._guess_back_to_page(mod, option, obj_type),
                     },
                     {
                         "text": self.strings("close_btn"),
@@ -405,7 +417,7 @@ class HerokuConfigMod(loader.Module):
                         "callback": self.inline__configure,
                         "args": (mod,),
                         "style": "primary",
-                        "kwargs": {"obj_type": obj_type},
+                        "kwargs": self._guess_back_to_page(mod, option, obj_type),
                     },
                     {
                         "text": self.strings("close_btn"),
@@ -477,7 +489,7 @@ class HerokuConfigMod(loader.Module):
                     "callback": self.inline__configure,
                     "args": (mod,),
                     "style": "primary",
-                    "kwargs": {"obj_type": obj_type},
+                    "kwargs": self._guess_back_to_page(mod, option, obj_type),
                 },
                 {
                     "text": self.strings("close_btn"),
@@ -523,7 +535,7 @@ class HerokuConfigMod(loader.Module):
                         "callback": self.inline__configure,
                         "args": (mod,),
                         "style": "primary",
-                        "kwargs": {"obj_type": obj_type},
+                        "kwargs": self._guess_back_to_page(mod, option, obj_type),
                     },
                     {
                         "text": self.strings("close_btn"),
@@ -631,7 +643,7 @@ class HerokuConfigMod(loader.Module):
                     "callback": self.inline__configure,
                     "args": (mod,),
                     "style": "primary",
-                    "kwargs": {"obj_type": obj_type},
+                    "kwargs": self._guess_back_to_page(mod, option, obj_type),
                 },
                 {
                     "text": self.strings("close_btn"),
@@ -705,7 +717,7 @@ class HerokuConfigMod(loader.Module):
                     "callback": self.inline__configure,
                     "args": (mod,),
                     "style": "primary",
-                    "kwargs": {"obj_type": obj_type},
+                    "kwargs": self._guess_back_to_page(mod, option, obj_type),
                 },
                 {
                     "text": self.strings("close_btn"),
@@ -901,7 +913,7 @@ class HerokuConfigMod(loader.Module):
                         "callback": self.inline__configure,
                         "args": (mod,),
                         "style": "primary",
-                        "kwargs": {"obj_type": obj_type},
+                        "kwargs": self._guess_back_to_page(mod, config_opt, obj_type),
                     },
                     {
                         "text": self.strings("close_btn"),
@@ -918,65 +930,188 @@ class HerokuConfigMod(loader.Module):
         mod: str,
         obj_type: typing.Union[bool, str] = False,
         folder: typing.Optional[str] = None,
+        category: typing.Optional[str] = None,
     ):
 
         module = self.lookup(mod)
+        grouped = module.config.grouped_options()
 
-        direct = []
-        for param in module.config:
-            config_value = module.config._config.get(param)
-            if folder is None:
-                if (
-                    not config_value
-                    or not hasattr(config_value, "folder")
-                    or not config_value.folder
-                ):
-                    direct.append(param)
+        def fmt_value(option: str) -> str:
+            value = self._get_value(mod, option)
+            if len(value) >= 200:
+                value = list(utils.smart_split(*html.parse(value), 200))[0] + "..."
+            return value
+
+        close_btn = {
+            "text": self.strings["close_btn"],
+            "action": "close",
+            "style": "danger",
+        }
+
+        if category is not None:
+            params = list(grouped.get(category, []))
+            option_lines = [
+                "▫️ <code>{}</code>: <b>{}</b>".format(
+                    utils.escape_html(p), fmt_value(p)
+                )
+                for p in params
+            ]
+            options_text = "\n".join(option_lines) if option_lines else "No options"
+
+            cat_obj = module.config._categories.get(category)
+            cat_doc = cat_obj.getdoc() if cat_obj else ""
+
+            cat_text = self.strings[
+                (
+                    "configuring_category"
+                    if isinstance(obj_type, bool)
+                    else "configuring_category_lib"
+                )
+            ].format(
+                utils.escape_html(mod),
+                utils.escape_html(category),
+                utils.escape_html(cat_doc),
+                options_text,
+            )
+
+            return await call.edit(
+                cat_text,
+                reply_markup=list(
+                    utils.chunks(
+                        [
+                            {
+                                "text": opt,
+                                "callback": self.inline__configure_option,
+                                "kwargs": {
+                                    "obj_type": obj_type,
+                                    "mod": mod,
+                                    "config_opt": opt,
+                                },
+                            }
+                            for opt in params
+                        ],
+                        2,
+                    )
+                )
+                + [
+                    [
+                        {
+                            "text": self.strings["back_btn"],
+                            "callback": self.inline__configure,
+                            "args": (mod,),
+                            "style": "primary",
+                            "kwargs": {"obj_type": obj_type},
+                        },
+                        close_btn,
+                    ]
+                ],
+            )
+
+        elif folder is not None:
+            params = list(module.config)
+            option_lines = [
+                "▫️ <code>{}</code>: <b>{}</b>".format(
+                    utils.escape_html(p), fmt_value(p)
+                )
+                for p in params
+            ]
+            text = "\n".join(option_lines) if option_lines else "No options"
+
+            return await call.edit(
+                self.strings[
+                    (
+                        "configuring_mod"
+                        if isinstance(obj_type, bool)
+                        else "configuring_lib"
+                    )
+                ].format(utils.escape_html(mod), text),
+                reply_markup=list(
+                    utils.chunks(
+                        [
+                            {
+                                "text": opt,
+                                "callback": self.inline__configure_option,
+                                "kwargs": {
+                                    "obj_type": obj_type,
+                                    "mod": mod,
+                                    "config_opt": opt,
+                                },
+                            }
+                            for opt in params
+                        ],
+                        2,
+                    )
+                )
+                + [
+                    [
+                        {
+                            "text": self.strings["back_btn"],
+                            "callback": self.inline__global_config,
+                            "style": "primary",
+                            "kwargs": {"obj_type": obj_type},
+                        },
+                        close_btn,
+                    ]
+                ],
+            )
+
+        sections = []
+        btns = []
+        for section_name, section_params in grouped.items():
+            if section_name is None:
+                visible = [
+                    p
+                    for p in section_params
+                    if not getattr(module.config._config.get(p), "folder", None)
+                ]
+                if not visible:
+                    continue
+                sections.append(
+                    "\n".join(
+                        "▫️ <code>{}</code>: <b>{}</b>".format(
+                            utils.escape_html(p), fmt_value(p)
+                        )
+                        for p in visible
+                    )
+                )
+                btns += [
+                    {
+                        "text": opt,
+                        "callback": self.inline__configure_option,
+                        "kwargs": {"obj_type": obj_type, "mod": mod, "config_opt": opt},
+                    }
+                    for opt in visible
+                ]
             else:
-                direct.append(param)
+                cat_text = [
+                    self.strings["category_header"].format(
+                        utils.escape_html(section_name)
+                    )
+                ]
+                cat_text.extend(
+                    [
+                        "∟ ▫️ <code>{}</code>: <b>{}</b>".format(
+                            utils.escape_html(p), fmt_value(p)
+                        )
+                        for p in section_params
+                    ]
+                )
+                sections.append("\n".join(cat_text))
+                btns.append(
+                    {
+                        "text": f"📂 {section_name}",
+                        "callback": self.inline__configure,
+                        "args": (mod,),
+                        "kwargs": {"obj_type": obj_type, "category": section_name},
+                    }
+                )
 
-        btns = [
-            {
-                "text": param,
-                "callback": self.inline__configure_option,
-                "kwargs": {"obj_type": obj_type, "mod": mod, "config_opt": param},
-            }
-            for param in direct
-        ]
+        text = "\n".join(sections).lstrip("\n") if sections else "No options"
 
         await call.edit(
-            self.strings(
+            self.strings[
                 "configuring_mod" if isinstance(obj_type, bool) else "configuring_lib"
-            ).format(
-                utils.escape_html(mod),
-                (
-                    "\n".join(
-                        [
-                            "▫️ <code>{}</code>: <b>{}</b>".format(
-                                utils.escape_html(param),
-                                (
-                                    self._get_value(mod, param)
-                                    if len(self._get_value(mod, param)) < 200
-                                    else (
-                                        list(
-                                            utils.smart_split(
-                                                *html.parse(
-                                                    self._get_value(mod, param)
-                                                ),
-                                                200,
-                                            )
-                                        )[0]
-                                        + "..."
-                                    )
-                                ),
-                            )
-                            for param in direct
-                        ]
-                    )
-                    if direct
-                    else "No options"
-                ),
-            ),
+            ].format(utils.escape_html(mod), text),
             reply_markup=list(utils.chunks(btns, 2))
             + [
                 [
@@ -986,11 +1121,7 @@ class HerokuConfigMod(loader.Module):
                         "style": "primary",
                         "kwargs": {"obj_type": obj_type},
                     },
-                    {
-                        "text": self.strings("close_btn"),
-                        "action": "close",
-                        "style": "danger",
-                    },
+                    close_btn,
                 ]
             ],
         )
