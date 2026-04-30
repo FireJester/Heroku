@@ -11,6 +11,10 @@
 - add banner to help
 - fix double prefixes
 - fix RCE in web (add password and user to initializating client)
+- fix bot creation
+- fix chat creation
+- add category in config
+- fix addacc self reply logic
 
 ## 🪐 Heroku 2.0.0
 - rework utils
