@@ -20,10 +20,21 @@ import typing
 import signal
 
 import herokutl
+from aiogram.types import (
+    InlineQuery,
+    InlineQueryResultArticle,
+    InputTextMessageContent,
+)
 
 from .. import loader, utils
 
 logger = logging.getLogger(__name__)
+
+COMMAND_CHANGE_ONE = "[★]"
+COMMAND_CHANGE_TWO = "[☆]"
+
+BANNER_OK = "https://github.com/i-execute/Heroku/assets/terminal_ok.png"
+BANNER_BAD = "https://github.com/i-execute/Heroku/assets/terminal_bad.png"
 
 
 def hash_msg(message):
@@ -322,6 +333,16 @@ class TerminalMod(loader.Module):
         r"echo\s+.+\|\s*base64\s+--decode\s*\|\s*(sh|bash|zsh|dash|ksh)",
         r"curl\s+.*\|\s*(sh|bash|zsh|dash|ksh)",
         r"wget\s+.*-O\s*-\s*\|\s*(sh|bash|zsh|dash|ksh)",
+        r"mv\s+.*\s+\/dev\/null",
+        r">\s*\/etc\/(passwd|shadow|sudoers|hosts|crontab|fstab)",
+        r"truncate\s+.*-s\s+0\s+\/etc\/",
+        r"shred\s+.*\/(etc|boot|dev|sys|proc)\/",
+        r"(sh|bash|zsh|dash|ksh)\s+-[csi]+\s+['\"]?.*(rm|dd|mkfs|fdisk)",
+        r"python[23]?\s+-c\s+['\"].*os\.(system|popen|remove|unlink)",
+        r"perl\s+-e\s+['\"].*system\s*\(",
+        r"nc\s+.*-e\s+\/(bin|usr\/bin)\/(sh|bash)",
+        r"ncat\s+.*-e\s+\/(bin|usr\/bin)\/(sh|bash)",
+        r"openssl\s+.*-connect.*\|\s*(sh|bash|zsh)",
     ]
 
     def _is_dangerous(self, cmd: str) -> bool:
@@ -341,8 +362,10 @@ class TerminalMod(loader.Module):
             ),
         )
         self.activecmds = {}
+        self._inline_cmd_counter = 0
+        self._inline_last_cmd = {}
 
-    @loader.command()
+    @loader.command(alias="exec")
     async def terminalcmd(self, message):
         user_command = utils.get_args_raw(message)
         reply = await message.get_reply_message()
@@ -440,3 +463,113 @@ class TerminalMod(loader.Module):
                 await utils.answer(message, self.strings("killed"))
         else:
             await utils.answer(message, self.strings("no_cmd"))
+
+    def _get_inline_star(self, query_id: str, cmd: str) -> str:
+        last = self._inline_last_cmd.get(query_id)
+        if last is None or last == cmd:
+            star = COMMAND_CHANGE_TWO
+        else:
+            star = COMMAND_CHANGE_ONE
+        self._inline_last_cmd[query_id] = cmd
+        return star
+
+    def _truncate_cmd(self, cmd: str, max_len: int = 15) -> str:
+        if len(cmd) > max_len:
+            return cmd[:max_len] + "..."
+        return cmd
+
+    @loader.inline_handler(
+        ru_doc="Выполнить команду в терминале",
+        en_doc="Execute a terminal command",
+    )
+    async def exec_inline_handler(self, query: InlineQuery):
+        """Execute a terminal command via inline"""
+        raw = query.query.strip()
+        if raw.lower().startswith("exec"):
+            raw = raw[4:].strip()
+
+        dangerous = self._is_dangerous(raw) if raw else False
+        thumbnail = BANNER_BAD if dangerous else BANNER_OK
+
+        if not raw:
+            await self._inline_answer(
+                query,
+                [
+                    self._make_article(
+                        uid="exec_hint_" + str(int(time.time())),
+                        title="Terminal",
+                        description="Введите команду после exec...",
+                        message_text="<b>Terminal:</b> Введите команду для выполнения.",
+                        thumbnail=BANNER_OK,
+                    )
+                ],
+            )
+            return
+
+        star = self._get_inline_star(query.from_user.id if query.from_user else "default", raw)
+        truncated = self._truncate_cmd(raw)
+        description = f"{star} {truncated}"
+
+        if dangerous:
+            msg_text = self.strings("dangerous_command").format(utils.escape_html(raw))
+            await self._inline_answer(
+                query,
+                [
+                    self._make_article(
+                        uid="exec_bad_" + str(int(time.time())),
+                        title="⚠️ Опасная команда",
+                        description=description,
+                        message_text=msg_text,
+                        thumbnail=thumbnail,
+                    )
+                ],
+            )
+            return
+
+        await self._inline_answer(
+            query,
+            [
+                self._make_article(
+                    uid="exec_ok_" + str(int(time.time())),
+                    title="Terminal",
+                    description=description,
+                    message_text=f"<b>Terminal:</b> Выполняю <code>{utils.escape_html(raw)}</code>...",
+                    thumbnail=thumbnail,
+                    inline_cmd=raw,
+                )
+            ],
+        )
+
+    async def _inline_answer(self, query: InlineQuery, results: list):
+        try:
+            await self.inline.bot.answer_inline_query(
+                inline_query_id=query.id,
+                results=results,
+                cache_time=0,
+                is_personal=True,
+            )
+        except Exception as ex:
+            logger.debug("answer_inline_query error: %s", ex)
+
+    def _make_article(
+        self,
+        uid: str,
+        title: str,
+        description: str,
+        message_text: str,
+        thumbnail: str = BANNER_OK,
+        inline_cmd: typing.Optional[str] = None,
+    ) -> InlineQueryResultArticle:
+        return InlineQueryResultArticle(
+            id=uid,
+            title=title,
+            description=description,
+            input_message_content=InputTextMessageContent(
+                message_text=message_text,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+            ),
+            thumbnail_url=thumbnail,
+            thumbnail_width=360,
+            thumbnail_height=360,
+        )
