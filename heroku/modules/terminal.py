@@ -33,8 +33,8 @@ logger = logging.getLogger(__name__)
 COMMAND_CHANGE_ONE = "[★]"
 COMMAND_CHANGE_TWO = "[☆]"
 
-BANNER_OK = "https://github.com/i-execute/Heroku/assets/terminal_ok.png"
-BANNER_BAD = "https://github.com/i-execute/Heroku/assets/terminal_bad.png"
+BANNER_OK = "https://github.com/coddrago/Heroku/assets/terminal_ok.png"
+BANNER_BAD = "https://github.com/coddrago/Heroku/assets/terminal_bad.png"
 
 
 def hash_msg(message):
@@ -309,7 +309,14 @@ class RawMessageEditor(SudoMessageEditor):
 class TerminalMod(loader.Module):
     """Runs commands"""
 
-    strings = {"name": "Terminal"}
+    strings = {
+        "name": "Terminal",
+        "exec_hint_desc": "Enter command after exec...",
+        "exec_hint_msg": "<b>Terminal:</b> Enter a command to execute.",
+        "exec_dangerous_title": "⚠️ Dangerous command",
+        "exec_ok_title": "Terminal",
+        "exec_running_msg": "<b>Terminal:</b> Running <code>{}</code>...",
+    }
 
     DANGEROUS_COMMANDS = [
         r"rm\s+.*\s+\/\s*\*?",
@@ -362,7 +369,6 @@ class TerminalMod(loader.Module):
             ),
         )
         self.activecmds = {}
-        self._inline_cmd_counter = 0
         self._inline_last_cmd = {}
 
     @loader.command(alias="exec")
@@ -464,13 +470,13 @@ class TerminalMod(loader.Module):
         else:
             await utils.answer(message, self.strings("no_cmd"))
 
-    def _get_inline_star(self, query_id: str, cmd: str) -> str:
-        last = self._inline_last_cmd.get(query_id)
+    def _get_inline_star(self, user_id, cmd: str) -> str:
+        last = self._inline_last_cmd.get(user_id)
         if last is None or last == cmd:
             star = COMMAND_CHANGE_TWO
         else:
             star = COMMAND_CHANGE_ONE
-        self._inline_last_cmd[query_id] = cmd
+        self._inline_last_cmd[user_id] = cmd
         return star
 
     def _truncate_cmd(self, cmd: str, max_len: int = 15) -> str:
@@ -497,16 +503,17 @@ class TerminalMod(loader.Module):
                 [
                     self._make_article(
                         uid="exec_hint_" + str(int(time.time())),
-                        title="Terminal",
-                        description="Введите команду после exec...",
-                        message_text="<b>Terminal:</b> Введите команду для выполнения.",
+                        title=self.strings("exec_ok_title"),
+                        description=self.strings("exec_hint_desc"),
+                        message_text=self.strings("exec_hint_msg"),
                         thumbnail=BANNER_OK,
                     )
                 ],
             )
             return
 
-        star = self._get_inline_star(query.from_user.id if query.from_user else "default", raw)
+        user_id = query.from_user.id if query.from_user else "default"
+        star = self._get_inline_star(user_id, raw)
         truncated = self._truncate_cmd(raw)
         description = f"{star} {truncated}"
 
@@ -517,7 +524,7 @@ class TerminalMod(loader.Module):
                 [
                     self._make_article(
                         uid="exec_bad_" + str(int(time.time())),
-                        title="⚠️ Опасная команда",
+                        title=self.strings("exec_dangerous_title"),
                         description=description,
                         message_text=msg_text,
                         thumbnail=thumbnail,
@@ -531,11 +538,12 @@ class TerminalMod(loader.Module):
             [
                 self._make_article(
                     uid="exec_ok_" + str(int(time.time())),
-                    title="Terminal",
+                    title=self.strings("exec_ok_title"),
                     description=description,
-                    message_text=f"<b>Terminal:</b> Выполняю <code>{utils.escape_html(raw)}</code>...",
+                    message_text=self.strings("exec_running_msg").format(
+                        utils.escape_html(raw)
+                    ),
                     thumbnail=thumbnail,
-                    inline_cmd=raw,
                 )
             ],
         )
@@ -558,7 +566,6 @@ class TerminalMod(loader.Module):
         description: str,
         message_text: str,
         thumbnail: str = BANNER_OK,
-        inline_cmd: typing.Optional[str] = None,
     ) -> InlineQueryResultArticle:
         return InlineQueryResultArticle(
             id=uid,
